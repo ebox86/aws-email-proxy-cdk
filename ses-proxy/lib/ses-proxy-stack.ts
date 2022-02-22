@@ -7,6 +7,7 @@ import {NodejsFunction} from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as path from 'path';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as ses from 'aws-cdk-lib/aws-ses'
+import * as actions from 'aws-cdk-lib/aws-ses-actions'
 import { Effect } from 'aws-cdk-lib/aws-iam';
 import * as route53 from "aws-cdk-lib/aws-route53";
 import { DnsValidatedDomainIdentity } from "aws-cdk-ses-domain-identity";
@@ -14,22 +15,13 @@ import { DnsValidatedDomainIdentity } from "aws-cdk-ses-domain-identity";
 export class SesProxyStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
-    
+  
+    // S3 and Lambda
+    // --> create s3 bucket for lambda
     const bucket = new s3.Bucket(this, this.node.tryGetContext('s3_bucket_name'));
 
-    const hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
-      domainName: this.node.tryGetContext('domain'),
-      privateZone: false,
-    });
-
-    // const identity = new DnsValidatedDomainIdentity(this, 'DomainIdentity', {
-    //   domainName: this.node.tryGetContext('domain'),
-    //   dkim: true,
-    //   region: process.env.CDK_DEFAULT_REGION,
-    //   hostedZone,
-    // });
-
-    const sesProxy = new NodejsFunction(this, id, {
+    // --> create lambda
+    const sesProxyLambda = new NodejsFunction(this, id, {
       environment: {
         region: cdk.Stack.of(this).region,
         s3_bucket_name:  this.node.tryGetContext('s3_bucket_name'),
@@ -45,7 +37,8 @@ export class SesProxyStack extends Stack {
       entry: path.join(__dirname, `/../src/lambda/index.js`),
     });
 
-    sesProxy.role!.attachInlinePolicy(
+    // --> attach execution policy to lambda
+    sesProxyLambda.role!.attachInlinePolicy(
       new iam.Policy(this, "SES Proxy", {
         statements: [
           new iam.PolicyStatement({
@@ -73,5 +66,67 @@ export class SesProxyStack extends Stack {
         ]
       })
     )
+
+    // SES setup
+    // --> get hosted zone for domain
+    const hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
+      domainName: this.node.tryGetContext('domain'),
+      privateZone: false,
+    });
+
+    // --> create mx record for ses on domain
+    const mxRecord = new route53.MxRecord(this, 'MxRecord', {
+      values: [{
+        hostName: this.node.tryGetContext('ses_send_endpoint'),
+        priority: 10,
+      }],
+      zone: hostedZone,
+      ttl: cdk.Duration.seconds(1800),
+    });
+
+    // --> create ses config set
+    const cfnConfigurationSet = new ses.CfnConfigurationSet(this, 'SesConfigurationSet', {
+      name: 'SesConfigurationSet',
+    });
+
+    // --> create a ses config set destination
+    const cfnConfigurationSetEventDestinationProps: ses.CfnConfigurationSetEventDestinationProps = {
+      configurationSetName: 'SesConfigurationSet',
+      eventDestination: {
+        matchingEventTypes: ['Hard bounces', 'Complaints', 'Deliveries', 'Rejects', 'Sends'],
+        cloudWatchDestination: {
+          dimensionConfigurations: [{
+            defaultDimensionValue: 'value',
+            dimensionName: 'X-Authenticated-Sender',
+            dimensionValueSource: 'emailHeader',
+          }],
+        },
+        enabled: true,
+        name: 'SES',
+      },
+    };
+
+    // --> create a ruleSet and create rule
+    const ruleSet = new ses.ReceiptRuleSet(this, 'RuleSet', {
+      dropSpam: true
+    });
+    const defaultRule = ruleSet.addRule('default-proxy-rule');
+    
+    // --> add actions to the rule
+    defaultRule.addAction(new actions.S3({
+      bucket,
+      objectKeyPrefix: this.node.tryGetContext('s3_prefix')
+    }));
+
+
+
+    // const identity = new DnsValidatedDomainIdentity(this, 'DomainIdentity', {
+    //   domainName: this.node.tryGetContext('domain'),
+    //   dkim: true,
+    //   region: process.env.CDK_DEFAULT_REGION,
+    //   hostedZone,
+    // });
+
+
   }
 }

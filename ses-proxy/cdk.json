@@ -33,6 +33,7 @@
     "from_email":"contact@",
     "subject_prefix": "",
     "allow_plus_sign": "true",
-    "domain": "outcasttrading.gg"
+    "domain": "outcasttrading.gg",
+    "ses_send_endpoint": "inbound-smtp.us-west-2.amazonaws.com"
   }
 }
