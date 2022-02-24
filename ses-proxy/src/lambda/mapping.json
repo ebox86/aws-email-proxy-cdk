@@ -1,11 +1,9 @@
 {
-  "test2": [
-    "ebox86@gmail.com"
+  "info@example.com": [
+    "example.john@example.com",
+    "example.jen@example.com"
   ],
-  "test1@outcasttrading.gg": [
-    "ebox86@gmail.com"
-  ],
-  "admin": [
-    "ebox86@gmail.com"
+  "abuse@example.com": [
+    "example.jim@example.com"
   ]
 }

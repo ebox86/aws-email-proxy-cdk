@@ -30,8 +30,8 @@
     ],
     "s3_bucket_name":"ses-email-proxy",
     "s3_prefix":"emailsPrefix/",
-    "domain": "outcasttrading.gg",
-    "from_email":"no-reply@outcasttrading.gg",
+    "domain": "example.comn",
+    "from_email":"no-reply@example.com",
     "subject_prefix": "",
     "allow_plus_sign": "true",
     "ses_send_endpoint": "inbound-smtp.us-west-2.amazonaws.com"
