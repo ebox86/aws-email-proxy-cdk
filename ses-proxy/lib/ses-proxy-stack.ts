@@ -11,6 +11,8 @@ import * as actions from 'aws-cdk-lib/aws-ses-actions'
 import { Effect } from 'aws-cdk-lib/aws-iam';
 import * as route53 from "aws-cdk-lib/aws-route53";
 import { DnsValidatedDomainIdentity } from "aws-cdk-ses-domain-identity";
+import {SesDefaultRuleSetCustomResourceConstruct} from "./ses-default-rule-set-custom-resource-construct";
+
 
 export class SesProxyStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -18,13 +20,39 @@ export class SesProxyStack extends Stack {
   
     // S3 and Lambda
     // --> create s3 bucket for lambda
-    const bucket = new s3.Bucket(this, this.node.tryGetContext('s3_bucket_name'));
+    const bucket = new s3.Bucket(this, this.node.tryGetContext('s3_bucket_name'), {
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+      lifecycleRules: [
+        {
+          expiration: cdk.Duration.days(365),
+        }
+      ]
+    });
+
+    // --> add bucket policy
+    bucket.addToResourcePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        sid: "GiveSESPermissionToWriteEmail",
+        principals: [
+          new iam.ServicePrincipal('ses.amazonaws.com')
+        ],
+        actions: ['s3:PutObject'],
+        resources: [`${bucket.bucketArn}/*`],
+        conditions: {
+          "StringEquals": {
+            "aws:Referer": `${cdk.Stack.of(this).account}`
+          }
+        }
+      })
+    )
 
     // --> create lambda
     const sesProxyLambda = new NodejsFunction(this, id, {
       environment: {
         region: cdk.Stack.of(this).region,
-        s3_bucket_name:  this.node.tryGetContext('s3_bucket_name'),
+        s3_bucket_name: bucket.bucketName,
         s3_prefix: this.node.tryGetContext('s3_prefix'),
         from_email: this.node.tryGetContext('from_email'),
         subject_prefix: this.node.tryGetContext('subject_prefix'),
@@ -33,7 +61,7 @@ export class SesProxyStack extends Stack {
       runtime: lambda.Runtime.NODEJS_12_X,
       memorySize: 1024,
       timeout: cdk.Duration.seconds(50),
-      handler: 'index.handler',
+      handler: 'handler',
       entry: path.join(__dirname, `/../src/lambda/index.js`),
     });
 
@@ -61,7 +89,7 @@ export class SesProxyStack extends Stack {
               "s3:GetObject",
               "s3:PutObject"
             ],
-            resources: [`arn:aws:s3:::${this.node.tryGetContext('s3_bucket_name')}/*`]
+            resources: [`${bucket.bucketArn}/*`]
           })
         ]
       })
@@ -107,26 +135,41 @@ export class SesProxyStack extends Stack {
     };
 
     // --> create a ruleSet and create rule
-    const ruleSet = new ses.ReceiptRuleSet(this, 'RuleSet', {
-      dropSpam: true
+    const defaultRuleSet = new ses.ReceiptRuleSet(this, 'RuleSet', {
+      receiptRuleSetName: 'default',
+      dropSpam: true,
+      rules: [
+        {
+          enabled: true,
+          actions: [
+            new actions.S3({
+              bucket,
+              objectKeyPrefix: this.node.tryGetContext('s3_prefix')
+            })
+          ]
+        },
+        {
+          enabled: true,
+          actions: [
+            new actions.Lambda({
+              function: sesProxyLambda
+            })
+          ]
+        }
+      ]
     });
-    const defaultRule = ruleSet.addRule('default-proxy-rule');
-    
-    // --> add actions to the rule
-    defaultRule.addAction(new actions.S3({
-      bucket,
-      objectKeyPrefix: this.node.tryGetContext('s3_prefix')
-    }));
 
+    // --> activate default ruleset
+    new SesDefaultRuleSetCustomResourceConstruct(this, 'cdkCallCustomResourceConstruct', {
+      receiptRuleSetName: defaultRuleSet.receiptRuleSetName
+    });
 
-
-    // const identity = new DnsValidatedDomainIdentity(this, 'DomainIdentity', {
-    //   domainName: this.node.tryGetContext('domain'),
-    //   dkim: true,
-    //   region: process.env.CDK_DEFAULT_REGION,
-    //   hostedZone,
-    // });
-
-
+    // --> verify the domain for SES
+    const identity = new DnsValidatedDomainIdentity(this, 'DomainIdentity', {
+      domainName: this.node.tryGetContext('domain'),
+      dkim: true,
+      region: process.env.CDK_DEFAULT_REGION,
+      hostedZone,
+    });
   }
 }

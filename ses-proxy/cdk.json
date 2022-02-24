@@ -30,10 +30,10 @@
     ],
     "s3_bucket_name":"ses-email-proxy",
     "s3_prefix":"emailsPrefix/",
-    "from_email":"contact@",
+    "domain": "outcasttrading.gg",
+    "from_email":"no-reply@outcasttrading.gg",
     "subject_prefix": "",
     "allow_plus_sign": "true",
-    "domain": "outcasttrading.gg",
     "ses_send_endpoint": "inbound-smtp.us-west-2.amazonaws.com"
   }
 }
