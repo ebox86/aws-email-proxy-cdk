@@ -4,11 +4,13 @@ Email proxy using AWS services SES, DDB and Lambda. The service can be used to r
 # setup
 These are some rough initial stesp for setup. More to come:
 
-1) First, run `aws configure` to configure your aws account with an iam credential pair for your account.
+1) Run `aws configure` to configure your aws account with an iam credential pair for your account.
 
-2) from the `./ses-proxy` directory, run `cdk bootstrap`
+2) Set your aws `account` and `region` from `./bin/ses-proxy.ts`
 
-3) once deployment is complete, open `cdk.json` and edit/verify the following 
+3) from the `./ses-proxy` directory, run `cdk bootstrap`
+
+4) once deployment is complete, open `cdk.json` and edit/verify the following 
 
 ``` json
     "s3_bucket_name":"ses-email-proxy", // S3 bucket name where SES stores emails.
@@ -26,7 +28,7 @@ These are some rough initial stesp for setup. More to come:
 | US West (Oregon)      | inbound-smtp.us-west-2.amazonaws.com |
 | Europe (Ireland)      | inbound-smtp.eu-west-1.amazonaws.com |
 
-4) deploy the stack:
+5) deploy the stack:
 
 **Option 1:** Pass `DOMAIN_NAME` and `FROM_EMAIL` as environment variables
 
@@ -44,7 +46,7 @@ In this case, deploy with simply:
 npx cdk deploy
 ```
 
-5) Configure mappings in DDB
+6) Configure mappings in DDB
 
 * sign into AWS account
 * navigate to DDB
@@ -73,9 +75,9 @@ To match all email addresses matching no other mapping, use "@" as a key.
 
 ![aws2](./ses-proxy/static/aws2.png)
 
-6. Repeat step 5 for as many aliases you would like to add for your domain.
+7) Repeat step 5 for as many aliases you would like to add for your domain.
 
-7. Apply for production access in SES by manually filling out the request form from the SES dashboard.
+8) Apply for production access in SES by manually filling out the request form from the SES dashboard.
 
 ![aws3](./ses-proxy/static/aws3.png)
 
