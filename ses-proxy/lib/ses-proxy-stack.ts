@@ -12,12 +12,19 @@ import { Effect } from 'aws-cdk-lib/aws-iam';
 import * as route53 from "aws-cdk-lib/aws-route53";
 import { DnsValidatedDomainIdentity } from "aws-cdk-ses-domain-identity";
 import {SesDefaultRuleSetCustomResourceConstruct} from "./ses-default-rule-set-custom-resource-construct";
-
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb"
 
 export class SesProxyStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
   
+    // DDB
+    // --> create table
+    const table = new dynamodb.Table(this, 'SES-proxy-forwarding', {
+      partitionKey: { name: 'alias', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+    });
+
     // S3 and Lambda
     // --> create s3 bucket for lambda
     const bucket = new s3.Bucket(this, this.node.tryGetContext('s3_bucket_name'), {
@@ -56,7 +63,8 @@ export class SesProxyStack extends Stack {
         s3_prefix: this.node.tryGetContext('s3_prefix'),
         from_email: this.node.tryGetContext('from_email'),
         subject_prefix: this.node.tryGetContext('subject_prefix'),
-        allow_plus_sign: this.node.tryGetContext('allow_plus_sign')
+        allow_plus_sign: this.node.tryGetContext('allow_plus_sign'),
+        table_name: table.tableName
       },
       runtime: lambda.Runtime.NODEJS_12_X,
       memorySize: 1024,
@@ -94,6 +102,9 @@ export class SesProxyStack extends Stack {
         ]
       })
     )
+
+    // --> grant the lambda access to read from ddb table
+    table.grantReadData(sesProxyLambda);
 
     // SES setup
     // --> get hosted zone for domain

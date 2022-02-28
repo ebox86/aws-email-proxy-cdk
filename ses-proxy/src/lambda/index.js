@@ -41,8 +41,20 @@ var defaultConfig = {
   emailBucket: process.env.s3_bucket_name,
   emailKeyPrefix: process.env.s3_prefix,
   allowPlusSign: process.env.allow_plus_sign === 'true',
-  forwardMapping: require('./mapping.json')
+  forwardMapping: require('./mapping.json'),
+  tableName: process.env.table_name
 };
+
+const docClient = new AWS.DynamoDB.DocumentClient({...process.env.region});
+
+async function scan(params){
+  try {
+    const data = await docClient.scan(params).promise()
+    return data
+  } catch (err) {
+    return err
+  }
+}
 
 /**
  * Parses the SES event record provided for the `mail` and `receipients` data.
@@ -78,7 +90,24 @@ exports.parseEvent = function(data) {
  *
  * @return {object} - Promise resolved with data.
  */
-exports.transformRecipients = function(data) {
+exports.transformRecipients = async function(data) {
+  console.log("getting alias mapping.");
+  var params = {
+    TableName : data.config.tableName,
+  };
+  var mapping = {}
+  var result
+  try {
+    const data = await scan(params)
+    result = data.Items
+  } catch (err) {
+    return { error: err }
+  }
+  result && (result.map(item => {
+    let key = item.alias
+    mapping = { ...mapping, [key]: item.mapping}
+  }))
+  data.config.forwardMapping = mapping ? mapping : data.config.forwardMapping;
   var newRecipients = [];
   data.originalRecipients = data.recipients;
   data.recipients.forEach(function(origEmail) {
