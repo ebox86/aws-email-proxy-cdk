@@ -17,7 +17,11 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb"
 export class SesProxyStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
-  
+    
+    // set vars
+    let domainName = process.env.DOMAIN_NAME ? process.env.DOMAIN_NAME : this.node.tryGetContext('domain')
+    let fromEmail = process.env.FROM_EMAIL ? process.env.FROM_EMAIL : this.node.tryGetContext('from_email')
+    
     // DDB
     // --> create table
     const table = new dynamodb.Table(this, 'SES-proxy-forwarding', {
@@ -61,7 +65,7 @@ export class SesProxyStack extends Stack {
         region: cdk.Stack.of(this).region,
         s3_bucket_name: bucket.bucketName,
         s3_prefix: this.node.tryGetContext('s3_prefix'),
-        from_email: this.node.tryGetContext('from_email'),
+        from_email: fromEmail,
         subject_prefix: this.node.tryGetContext('subject_prefix'),
         allow_plus_sign: this.node.tryGetContext('allow_plus_sign'),
         table_name: table.tableName
@@ -109,7 +113,7 @@ export class SesProxyStack extends Stack {
     // SES setup
     // --> get hosted zone for domain
     const hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
-      domainName: this.node.tryGetContext('domain'),
+      domainName: domainName,
       privateZone: false,
     });
 
@@ -177,7 +181,7 @@ export class SesProxyStack extends Stack {
 
     // --> verify the domain for SES
     const identity = new DnsValidatedDomainIdentity(this, 'DomainIdentity', {
-      domainName: this.node.tryGetContext('domain'),
+      domainName: domainName,
       dkim: true,
       region: process.env.CDK_DEFAULT_REGION,
       hostedZone,

@@ -4,37 +4,6 @@ var AWS = require('aws-sdk');
 
 console.log("AWS Lambda SES Forwarder // @arithmetric // Version 5.0.0");
 
-// Configure the S3 bucket and key prefix for stored raw emails, and the
-// mapping of email addresses to forward from and to.
-//
-// Expected keys/values:
-//
-// - fromEmail: Forwarded emails will come from this verified address
-//
-// - subjectPrefix: Forwarded emails subject will contain this prefix
-//
-// - emailBucket: S3 bucket name where SES stores emails.
-//
-// - emailKeyPrefix: S3 key name prefix where SES stores email. Include the
-//   trailing slash.
-//
-// - allowPlusSign: Enables support for plus sign suffixes on email addresses.
-//   If set to `true`, the username/mailbox part of an email address is parsed
-//   to remove anything after a plus sign. For example, an email sent to
-//   `example+test@example.com` would be treated as if it was sent to
-//   `example@example.com`.
-//
-// - forwardMapping: Object where the key is the lowercase email address from
-//   which to forward and the value is an array of email addresses to which to
-//   send the message.
-//
-//   To match all email addresses on a domain, use a key without the name part
-//   of an email address before the "at" symbol (i.e. `@example.com`).
-//
-//   To match a mailbox name on all domains, use a key without the "at" symbol
-//   and domain part of an email address (i.e. `info`).
-//
-//   To match all email addresses matching no other mapping, use "@" as a key.
 var defaultConfig = {
   fromEmail: process.env.from_email,
   subjectPrefix: process.env.subject_prefix,
